@@ -19,3 +19,5 @@ src/ui/menu.xml~
 src/ui/settings.glade~
 typings/*
 venvbuild/
+build-local/
+REVERT-GNOME-BINDING.sh

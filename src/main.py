@@ -79,7 +79,7 @@ class SmilePanel(Adw.Application):
         if self.start_hidden:
             panel.overlay_ctl.prepare()
             self.start_hidden = False  # only the very first activation of --daemon stays hidden
-            self.hotkeys = HotkeyDaemon(lambda: GLib.idle_add(self.activate_action, 'toggle', None))
+            self.hotkeys = HotkeyDaemon(lambda: self.activate_action('toggle', None))
             self.hotkeys.start()
         else:
             panel.overlay_ctl.show()

@@ -290,6 +290,7 @@ class OverlayController:
             try:
                 pos = self.root.translate_coords(self._win(self.xid()), 0, 0)
                 cur = (pos.x, pos.y)
+                log.debug('position after map: wanted %d,%d got %d,%d', x, y, *cur)
                 if abs(cur[0] - x) > 2 or abs(cur[1] - y) > 2:
                     flags = 1 | (1 << 8) | (1 << 9) | (SOURCE_PAGER << 12)  # NorthWest gravity, x+y valid, pager source
                     self._client_message(self.xid(), '_NET_MOVERESIZE_WINDOW', [flags, x, y, 0, 0])
@@ -358,6 +359,7 @@ class OverlayController:
 
     def _on_raw_button_press(self) -> None:
         px, py = self._pointer()      # raw events carry no window coordinates: ask for the pointer now
+        log.debug('raw button press at %d,%d; own rects %s', px, py, self._own_rects())
         for x, y, w, h in self._own_rects():
             if x - HIT_MARGIN <= px < x + w + HIT_MARGIN and y - HIT_MARGIN <= py < y + h + HIT_MARGIN:
                 return                # click inside the panel (or one of its popups): keep open
@@ -394,6 +396,7 @@ class OverlayController:
         if not self.is_visible():
             self._remember_target()
             x, y = self.compute_position()
+            log.debug('show: pointer %s -> panel at %d,%d', self._pointer(), x, y)
             self._move(x, y)
             self._start_watch()
             self.window.present()

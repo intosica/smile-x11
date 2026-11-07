@@ -51,3 +51,34 @@ Anomalies found while testing:
   `_NET_ACTIVE_WINDOW` and `XGetInputFocus` to name the target (≤200 ms, then XSetInputFocus fallback).
 * GtkText only emits `activate` for plain Enter; Shift+Enter is handled in the key controller.
 * GTK4 creates hidden leader windows with the same title; test targets are picked by `WM_STATE`.
+
+## Phase 4 — global hotkeys (`smile-panel --daemon`, tests/run_hotkeys_xephyr.sh)
+
+`hotkey_x11.py` grabs Super+period and Super+semicolon on the root window with XGrabKey, once for each of
+the 8 NumLock/CapsLock/ScrollLock combinations, on a background thread (own Xlib connection) that calls
+`GLib.idle_add` to toggle the panel. Keymap changes (MappingNotify) re-grab. A grab refused with BadAccess
+is logged with instructions and the other key still works.
+
+| Desktop / WM | Super+. | Super+; | Lock-key variants | Notes |
+|---|---|---|---|---|
+| Openbox (Xephyr) | pass (built-in grab) | pass | pass (CapsLock, NumLock) | |
+| Fluxbox (Xephyr) | pass (built-in grab) | pass | pass | |
+| GNOME Shell / mutter, X11 | pass via GNOME custom shortcut → `smile-panel --toggle` | same (custom1) | n/a | mutter handles the key before our XGrabKey; the daemon's grab is harmless and never fires (checked with debug log), so no double toggle |
+| IceWM (Xephyr) | **fails** | **fails** | – | IceWM takes an active keyboard grab when Super is pressed (`XGrabKeyboard` from another client returns AlreadyGrabbed), so no Super+key reaches any client. Bind `smile-panel --toggle` in `~/.icewm/keys`, e.g. `key "Super+period" smile-panel --toggle` |
+
+Overlay behaviour (tests/run_overlay_xephyr.sh): openbox, fluxbox, icewm all pass the Phase 3 checks.
+
+### Hotkey conflicts and how to resolve them
+* **Another `smile-panel --daemon` or the old SMILE** holding Super+period → BadAccess message; stop it.
+* **Flatpak SMILE (`it.mijorus.smile`)** — on this host it was bound through GNOME custom shortcut `custom0`
+  (`flatpak run it.mijorus.smile`). Repointed to `~/.local/bin/smile-panel --toggle`; undo with
+  `REVERT-GNOME-BINDING.sh`.
+* **IBus emoji picker** — `org.freedesktop.ibus.panel.emoji hotkey` defaults to `['<Super>semicolon', '<Super>period']`.
+  On IBus-driven desktops it holds the same keys. Disable with
+  `gsettings set org.freedesktop.ibus.panel.emoji hotkey "[]"`.
+* **GNOME Shell**: no built-in emoji shortcut under X11 beyond IBus's; Super+period/semicolon can be used with
+  custom shortcuts as above (the shell, not our daemon, services them).
+* **KDE/Plasma, XFCE, Cinnamon**: default configs don't bind Super+period/semicolon (not tested here); if a
+  DE shortcut already uses them, remove it or use `smile-panel --toggle` from the DE's shortcut editor.
+* When the DE/WM owns the shortcut, the daemon process is still required only for fast startup; the D-Bus
+  service file starts it on demand.

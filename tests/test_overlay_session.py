@@ -86,7 +86,7 @@ check('3 emoji typed, panel still visible', len(typed) >= 3 and panel_win() is n
 run('xdotool', 'mousemove', str(x + 200), str(y + 380), 'click', '1')   # empty grid area (whitespace)
 time.sleep(0.3)
 check('inside click keeps panel', panel_win() is not None)
-run('xdotool', 'mousemove', str(PX), str(PY), 'click', '1')
+run('xdotool', 'mousemove', str(tx + twid // 6), str(ty + thei // 2), 'click', '1')   # other spot of the target app, left of the panel
 time.sleep(0.4)
 check('outside click (other app) closes', panel_win() is None)
 toggle()
