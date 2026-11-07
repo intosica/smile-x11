@@ -1,0 +1,1 @@
+option('python_path', type: 'string', value: '', description: 'Python interpreter with PyGObject + python-xlib (default /usr/bin/python3)')

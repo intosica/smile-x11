@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+    <id>local.winpanel.Smile</id>
+    <name>Smile Panel</name>
+    <summary>Windows-style emoji panel for X11</summary>
+    <launchable type="desktop-id">local.winpanel.Smile.desktop</launchable>
+    <metadata_license>CC0-1.0</metadata_license>
+    <project_license>GPL-3.0-or-later</project_license>
+    <developer_name>Fork of SMILE by Lorenzo Paderi</developer_name>
+    <description>
+        <p>A transient emoji overlay that types the chosen emoji directly into the previously focused X11 application, without touching the clipboard.</p>
+    </description>
+</component>

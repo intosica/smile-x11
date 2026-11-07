@@ -25,7 +25,7 @@ class CustomTagEntry(CustomPopover):
 
         localized_tags = []
 
-        settings: Gio.Settings = Gio.Settings.new('it.mijorus.smile')
+        settings: Gio.Settings = Gio.Settings.new('local.winpanel.Smile')
         if settings.get_boolean('use-localized-tags'):
             tl = get_localized_tags(settings.get_string('tags-locale'), self.relative_widget_hexcode, Gio.Application.get_default().datadir)
             localized_tags = ', '.join(tl)

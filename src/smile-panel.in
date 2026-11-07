@@ -1,0 +1,42 @@
+#!@PYTHON@
+# smile-panel launcher. X11 only: GDK is forced onto the X11 backend.
+import os
+import sys
+import signal
+
+VERSION = '@VERSION@'
+pkgdatadir = '@pkgdatadir@'
+localedir = '@localedir@'
+APP_ID = 'local.winpanel.Smile'
+APP_PATH = '/local/winpanel/Smile'
+
+os.environ['GDK_BACKEND'] = 'x11'
+sys.path.insert(1, pkgdatadir)
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+# Fast path: `smile-panel --toggle` against a running instance is one D-Bus call.
+# gdbus avoids importing PyGObject (~40 ms); if it is missing or the app is not
+# running we fall through to the normal start-up, which handles both cases.
+if sys.argv[1:] == ['--toggle']:
+    import subprocess
+    try:
+        if subprocess.run(['gdbus', 'call', '--session', '--timeout', '2', '--dest', APP_ID,
+                           '--object-path', APP_PATH, '--method', 'org.freedesktop.Application.ActivateAction',
+                           'toggle', '[]', '{}'],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+            sys.exit(0)
+    except FileNotFoundError:
+        pass
+
+import locale
+import gettext
+locale.bindtextdomain('smile-panel', localedir)
+locale.textdomain('smile-panel')
+gettext.install('smile-panel', localedir)
+
+if __name__ == '__main__':
+    from gi.repository import Gio
+    Gio.Resource.load(os.path.join(pkgdatadir, 'smile-panel.gresource'))._register()
+
+    from smile_panel import main
+    sys.exit(main.main(VERSION, pkgdatadir))

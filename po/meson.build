@@ -1,1 +1,1 @@
-i18n.gettext('smile', preset: 'glib')
+i18n.gettext('smile-panel', preset: 'glib')

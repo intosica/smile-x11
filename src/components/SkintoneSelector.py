@@ -15,7 +15,7 @@ class SkintoneSelector(CustomPopover):
         self.click_handler = click_handler
         self.emoji_button = emoji_button
         self.flowbox_widgets: list[EmojiButton] = []
-        settings: Gio.Settings = Gio.Settings.new('it.mijorus.smile')
+        settings: Gio.Settings = Gio.Settings.new('local.winpanel.Smile')
         skintone_modifier = settings.get_string('skintone-modifier')
 
         popover_content = Gtk.Box(

@@ -3,26 +3,20 @@ import gi
 import json
 from datetime import datetime
 
-from dbus import Array as DBusArray
 from .assets.emoji_list import emojis
 from .lib.user_config import read_json_config, save_json_config
 from .lib.custom_tags import set_custom_tags, get_all_custom_tags, delete_custom_tags
 from .lib.localized_tags import get_countries_list
-from .utils import portal
-from .components.UrlRow import UriRow
-from .lib.DbusService import DbusService, GNOME_EXTENSION_LINK
 
 
 from gi.repository import Gtk, Gio, Gdk, GLib, Adw
 
 
 class Settings(Adw.PreferencesWindow):
-    WIKI_PAGE = 'https://smile.mijorus.it/docs/paste-automatically-on-wayland/'
-
     def __init__(self, application_id: str, **kwargs):
         super().__init__(**kwargs)
         self.application_id = application_id
-        self.settings = Gio.Settings.new('it.mijorus.smile')
+        self.settings = Gio.Settings.new('local.winpanel.Smile')
 
         if self.settings.get_string('tags-locale') == 'en':
             self.settings.set_string('tags-locale', 'da')
@@ -32,44 +26,9 @@ class Settings(Adw.PreferencesWindow):
         # General group
         general_group = Adw.PreferencesGroup(title=_('General'))
         general_group.add(
-            self.create_boolean_settings_entry(_('Run in the background'), 'load-hidden-on-startup', _('Keep Smile running in the background for a faster launch'))
+            self.create_boolean_settings_entry(_('Keep open after inserting'), 'keep-open-after-insert', _('Keep the panel open to insert several emojis; Shift+Enter / Shift+Click does the opposite'))
         )
-
-        general_group.add(
-            self.create_boolean_settings_entry(_('Minimize on exit'), 'iconify-on-esc',  _('Minimize the window when selecting an emoji'))
-        )
-
         general_group.add(self.create_launch_shortcut_settings_entry())
-
-        # Mouse group
-        shortcuts_group = Adw.PreferencesGroup(title=_('Mouse behaviour'))
-        shortcuts_group.add(
-            self.create_boolean_settings_entry(_('Mouse multi select'), 'mouse-multi-select',  _('Select multiple emojis with a single mouse click, replacing Shift + Click; press Enter to confirm and Esc to dismiss.'))
-        )
-
-        # Paste emoji group
-        paste_emoji_group = Adw.PreferencesGroup(title=_('Paste emojis automatically'))
-        
-        auto_paste_status = self.get_autopaste_status()
-        auto_paste_suff = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3, valign=Gtk.Align.CENTER, tooltip_text=auto_paste_status[3])
-    
-        [auto_paste_suff.append(el) for el in [
-            Gtk.Label(label=_('Status:'), css_classes=['heading']), 
-            Gtk.Image(icon_name=auto_paste_status[1], css_classes=[auto_paste_status[2]])
-        ]]
-
-        use_ext_row =  self.create_boolean_settings_entry(
-            _('Enabled'), 
-            'auto-paste',
-            _('Emulates the Ctrl+V shortcut; might <b>not work</b> on some programs.\nIf using the extension, <b>please ensure that it is correctly ENABLED</b>.')
-        )
-
-        paste_emoji_group.set_header_suffix(auto_paste_suff)
-        use_ext_row.set_sensitive(auto_paste_status[0])
-
-        wiki_page_row = UriRow(website=self.WIKI_PAGE, title=_('Learn how to paste automatically on Wayland'))
-        get_ext_link_row = UriRow(website=GNOME_EXTENSION_LINK, title=_('Get the GNOME extension'), subtitle=_('Install the extension to paste automatically on X11 and Wayland'))
-        [paste_emoji_group.add(el) for el in [use_ext_row, wiki_page_row, get_ext_link_row]]
 
         # Customization group
         customization_group = Adw.PreferencesGroup(title=_('Customization'))
@@ -91,14 +50,14 @@ class Settings(Adw.PreferencesWindow):
         ]
 
         [self.localized_tags_group.add(item) for item in self.localized_tags_group_items]
-        [self.page1.add(el) for el in [general_group, shortcuts_group, paste_emoji_group, customization_group, self.localized_tags_group]]
+        [self.page1.add(el) for el in [general_group, customization_group, self.localized_tags_group]]
 
         # Page 2
         self.page2 = Adw.PreferencesPage(title=_('Custom tags'), icon_name='smile-symbolic')
         self.custom_tags_list_box = Gtk.ListBox(css_classes=['boxed-list'])
         
         bldr = Gtk.Builder()
-        bldr.add_from_resource('/it/mijorus/smile/ui/importexport-customtags.ui')
+        bldr.add_from_resource('/local/winpanel/Smile/ui/importexport-customtags.ui')
         import_export_widget = bldr.get_object('importexport_group')
 
         self.export_button = bldr.get_object('importexport_export_button')
@@ -124,17 +83,6 @@ class Settings(Adw.PreferencesWindow):
         self.settings.connect('changed', self.on_settings_changes)
         self.connect('close-request', self.on_window_close)
 
-    def get_autopaste_status(self):
-        if DbusService.extension_status == 'installed':
-            return (True, 'checkmark-symbolic', 'success', _('Available (using the GNOME extension)'))
-        elif os.getenv('XDG_SESSION_TYPE') == 'wayland':
-            if DbusService.dbus_connection:
-                return (True, 'horizontal-arrows-none-symbolic', 'success', _('Available using D-Bus (setup may be required)'))
-            else:
-                return (False, 'smile-warning-small-symbolic', 'warning', _('Requires the GNOME extension on Wayland'))
-        else:
-            return (True, 'checkmark-symbolic', 'success', _('Available (using xdotool on X11)'))
-
     def create_boolean_settings_entry(self, label: str, key: str, subtitle: str = None, usable: bool = True, add_to=None) -> Adw.ActionRow:
         row = Adw.ActionRow(title=label, subtitle=subtitle)
 
@@ -147,10 +95,10 @@ class Settings(Adw.PreferencesWindow):
     def create_launch_shortcut_settings_entry(self) -> Adw.ActionRow:
         row = Adw.ActionRow(
             title=_('Launch the app with a shortcut'),
-            subtitle=_('Create a new keyboard shortcut in your system settings and paste the following code as a custom command')
+            subtitle=_('Bind this command to a shortcut in your WM/DE, or run `smile-panel --daemon` for the built-in Super+. / Super+; listener')
         )
 
-        row.add_suffix(Gtk.Label(label=f'flatpak run {self.application_id}', selectable=True))
+        row.add_suffix(Gtk.Label(label='smile-panel --toggle', selectable=True))
 
         return row
 
@@ -279,16 +227,6 @@ class Settings(Adw.PreferencesWindow):
 
     def on_use_localized_tags_changed(self, settings, key: str):
         [item.set_sensitive(settings.get_boolean(key)) for item in self.localized_tags_group_items]
-
-    def on_load_hidden_on_startup_changed(self, settings, key: str):
-        value: bool = settings.get_boolean(key)
-
-        old_autostart_file = Gio.File.new_for_path(f'{GLib.get_home_dir()}/.config/autostart/smile.autostart.desktop')
-        if old_autostart_file.query_exists():
-            old_autostart_file.delete()
-
-        inter = portal("org.freedesktop.portal.Background")
-        res = inter.RequestBackground('', {'reason': 'Smile autostart', 'autostart': value, 'background': value, 'commandline': DBusArray(['smile', '--start-hidden'])})
 
     def on_export_tags_clicked(self, w):
         dialog = Gtk.FileDialog()

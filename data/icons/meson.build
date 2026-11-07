@@ -1,4 +1,4 @@
-application_id = 'it.mijorus.smile'
+application_id = 'local.winpanel.Smile'
 
 scalable_dir = join_paths('hicolor', 'scalable', 'apps')
 install_data(

@@ -16,13 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import gi
-import os
-import threading
-import subprocess
 import re
-import subprocess
-import gc
-from time import time_ns, sleep
 from typing import Optional
 
 from .ShortcutsWindow import ShortcutsWindow
@@ -34,7 +28,8 @@ from .lib.custom_tags import get_custom_tags
 from .lib.localized_tags import get_localized_tags
 from .lib.emoji_history import increment_emoji_usage_counter, get_history
 from .utils import tag_list_contains, debounce, idle
-from .lib.DbusService import DbusService, DBUS_SERVICE_INTERFACE, DBUS_SERVICE_PATH
+from .window_x11 import OverlayController
+from . import input_x11
 from .assets.emoji_list import emojis, emoji_categories
 
 gi.require_version('Gtk', '4.0')
@@ -44,13 +39,12 @@ from gi.repository import Gtk, Gio, Gdk, Adw, GLib, Pango  # noqa
 
 class Picker(Gtk.ApplicationWindow):
     def __init__(self, *args, **kwargs):
-        super().__init__(title="Smile", resizable=True, *args, **kwargs)
+        super().__init__(title="Smile Panel", *args, **kwargs)
+        self.overlay_ctl = OverlayController(self)
 
-        EMOJI_LIST_MIN_HEIGHT = 320
         self.EMOJI_GRID_COL_N = 5
 
-        self.set_default_size(1, 1)
-        self.settings: Gio.Settings = Gio.Settings.new('it.mijorus.smile')
+        self.settings: Gio.Settings = Gio.Settings.new('local.winpanel.Smile')
 
         self.search_entry = Gtk.SearchEntry(hexpand=True, width_request=200)
         self.list_model = Gio.ListStore(item_type=EmojiItem)
@@ -72,20 +66,14 @@ class Picker(Gtk.ApplicationWindow):
         self.emoji_items: list[EmojiItem] = []
         self.refresh_emoji_items()
 
-        self.last_copied_text = None
         self.data_dir = Gio.Application.get_default().datadir
         self.selected_category_index = 0
         self.selected_category = 'smileys-emotion'
-        self.selection: list[str] = []
-        self.selected_buttons: list[EmojiButton] = []
-        self.clipboard = Gdk.Display.get_default().get_clipboard()
         self.categories_count = 0
-        self.shift_key_pressed = False
         self.skintone_selector: Optional[SkintoneSelector] = None
 
         event_controller_keys = Gtk.EventControllerKey()
         event_controller_keys.connect('key-pressed', self.handle_window_key_press)
-        event_controller_keys.connect('key-released', self.handle_window_key_release)
         self.add_controller(event_controller_keys)
 
         self.settings.connect('changed::skintone-modifier', self.update_emoji_skintones)
@@ -108,32 +96,11 @@ class Picker(Gtk.ApplicationWindow):
 
         self.list_tip_revealer.set_child(self.list_tip_label)
 
-        self.select_buffer_label = Gtk.Label(margin_bottom=2, css_classes=['title-2'], hexpand=True, halign=Gtk.Align.START, ellipsize=Pango.EllipsizeMode.START)
-
-        select_buffer_button = Gtk.Button(icon_name='arrow2-right-symbolic', valign=Gtk.Align.CENTER)
-        select_buffer_button.connect('clicked', lambda w: self.copy_and_quit())
-
-        pop_buffer_btn = Gtk.Button(icon_name='smile-entry-clear-symbolic', valign=Gtk.Align.CENTER, css_classes=['flat'])
-        pop_buffer_btn.connect('clicked', lambda w: self.deselect_last_selected_emoji())
-
-        select_buffer_container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, css_classes=['selected-emojis-box'], spacing=2)
-        [select_buffer_container.append(w) for w in [self.select_buffer_label, pop_buffer_btn, select_buffer_button]]
-
-        self.select_buffer_revealer = Gtk.Revealer(
-            reveal_child=False,
-            css_classes=['solid-overlay'],
-            child=select_buffer_container,
-            valign=Gtk.Align.END
-        )
-
         self.refresh_emoji_list()
         self.category_picker_widgets: list[Gtk.Button] = []
         self.category_picker = self.create_category_picker()
 
         scrolled_emoji_window = Gtk.ScrolledWindow(
-            min_content_height=EMOJI_LIST_MIN_HEIGHT,
-            propagate_natural_height=True,
-            propagate_natural_width=True,
             vexpand=True
         )
 
@@ -143,13 +110,12 @@ class Picker(Gtk.ApplicationWindow):
         emoji_list_overlay_container = Gtk.Overlay(child=scrolled_emoji_window)
 
         emoji_list_overlay_container.add_overlay(self.list_tip_revealer)
-        emoji_list_overlay_container.add_overlay(self.select_buffer_revealer)
 
         self.viewport_box.append(emoji_list_overlay_container)
         self.viewport_box.append(self.category_picker)
 
         # Create search entry
-        search_container = Gtk.Box()
+        search_container = Gtk.Box(hexpand=True)
 
         self.search_entry.connect('search_changed', self.search_emoji)
         self.search_entry.connect('activate', self.handle_search_entry_activate)
@@ -163,13 +129,10 @@ class Picker(Gtk.ApplicationWindow):
 
         self.search_entry.add_controller(search_controller_key)
 
-        # Create an header bar
-        header_bar = Adw.HeaderBar(title_widget=Gtk.Box(), decoration_layout='menu:close', css_classes=['flat'])
-        menu_button = self.create_menu_button()
-        header_bar.pack_start(menu_button)
-        header_bar.set_title_widget(search_container)
-
-        self.set_titlebar(header_bar)
+        top_bar = Gtk.Box(spacing=4, css_classes=['panel-topbar'])
+        top_bar.append(search_container)
+        top_bar.append(self.create_menu_button())
+        self.viewport_box.prepend(top_bar)
 
         self.overlay = Adw.ToastOverlay()
         self.overlay.set_child(self.viewport_box)
@@ -180,21 +143,17 @@ class Picker(Gtk.ApplicationWindow):
         self.search_entry.grab_focus()
 
     def on_activation(self):
-        self.present_with_time(Gdk.CURRENT_TIME)
-        self.grab_focus()
-
-        if self.settings.get_boolean('iconify-on-esc'):
-            self.unminimize()
+        self.overlay_ctl.show()
 
         self.set_focus(self.search_entry)
 
     # Create stuff
     def create_menu_button(self):
         builder = Gtk.Builder()
-        builder.add_from_resource('/it/mijorus/smile/ui/menu.ui')
+        builder.add_from_resource('/local/winpanel/Smile/ui/menu.ui')
         menu = builder.get_object('primary_menu')
 
-        return Gtk.MenuButton(menu_model=menu, icon_name='open-menu-symbolic')
+        return Gtk.MenuButton(menu_model=menu, icon_name='open-menu-symbolic', css_classes=['flat'])
 
     def create_category_picker(self) -> Gtk.Box:
         box = Gtk.Box(spacing=0, halign=Gtk.Align.CENTER, hexpand=True, name='emoji_categories_box')
@@ -302,32 +261,33 @@ class Picker(Gtk.ApplicationWindow):
     # Handle events
     def handle_emoji_button_click(self, widget: Gtk.Button):
         widget.get_parent().grab_focus()
+        self.insert(widget, invert_close=self.shift_held())
 
-        if self.settings.get_boolean('mouse-multi-select'):
-            if self.shift_key_pressed:
-                self.copy_and_quit(widget)
-            else:
-                self.select_emoji_button(widget)
-        else:
-            if not self.shift_key_pressed:
-                self.copy_and_quit(widget)
-            else:
-                self.select_emoji_button(widget)
+    @staticmethod
+    def shift_held() -> bool:
+        kbd = Gdk.Display.get_default().get_default_seat().get_keyboard()
+        return bool(kbd.get_modifier_state() & Gdk.ModifierType.SHIFT_MASK)
 
-    # Handle key-presses
-    def handle_window_key_release(self, controller: Gtk.EventController, keyval: int, keycode: int, state: Gdk.ModifierType) -> bool:
-        if (keyval == Gdk.KEY_Shift_L or keyval == Gdk.KEY_Shift_R):
-            self.shift_key_pressed = False
-
-        return False
+    def insert(self, button: EmojiButton, invert_close: bool = False):
+        """Type the emoji into the target app via XTest (never the clipboard)."""
+        text = button.get_label()
+        try:
+            input_x11.type_text(text)
+        except input_x11.InjectionError as e:
+            notification = Gio.Notification.new(_('Could not insert emoji'))
+            notification.set_body(str(e))
+            notification.set_icon(Gio.ThemedIcon.new('dialog-error'))
+            self.get_application().send_notification('insert-error', notification)
+            return
+        increment_emoji_usage_counter(button)
+        if self.settings.get_boolean('keep-open-after-insert') == invert_close:
+            self.default_hiding_action()
 
     # Handle every possible keypress here, returns True if the event was handled (prevent default)
     def handle_window_key_press(self, controller: Gtk.EventController, keyval: int, keycode: int, state: Gdk.ModifierType) -> bool:
         if (keyval == Gdk.KEY_Escape):
-            self.default_hiding_action(paste_on_exit=False)
+            self.default_hiding_action()
             return True
-
-        self.shift_key_pressed = (keyval == Gdk.KEY_Shift_L or keyval == Gdk.KEY_Shift_R)
 
         ctrl_key = bool(state & Gdk.ModifierType.CONTROL_MASK)
         shift_key = bool(state & Gdk.ModifierType.SHIFT_MASK)
@@ -342,7 +302,7 @@ class Picker(Gtk.ApplicationWindow):
         if isinstance(focused_widget, EmojiButton):
             focused_button = focused_widget
 
-        if self.search_entry is focused_widget.get_parent():
+        if focused_widget and self.search_entry is focused_widget.get_parent():
             if (keyval == Gdk.KEY_Down):
                 self.grid_view.grab_focus()
                 return True
@@ -373,15 +333,9 @@ class Picker(Gtk.ApplicationWindow):
             return False
 
         if shift_key:
-            if (keyval == Gdk.KEY_Return):
-                if focused_button:
-                    self.select_emoji_button(focused_button)
-                    return True
-
-            if (keyval == Gdk.KEY_BackSpace):
-                if focused_button:
-                    self.deselect_last_selected_emoji()
-                    return True
+            if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and focused_button:
+                self.insert(focused_button, invert_close=True)
+                return True
 
         elif ctrl_key:
             if keyval == Gdk.KEY_q:
@@ -391,11 +345,6 @@ class Picker(Gtk.ApplicationWindow):
             elif keyval == Gdk.KEY_question:
                 shortcut_window = ShortcutsWindow()
                 shortcut_window.open()
-
-            elif (keyval == Gdk.KEY_Return):
-                if self.selection:
-                    self.copy_and_quit()
-                    return True
 
             elif keyval == Gdk.KEY_BackSpace:
                 self.search_entry.set_text('')
@@ -410,12 +359,8 @@ class Picker(Gtk.ApplicationWindow):
 
             if focused_button:
                 # Focus is on an emoji button
-                if (keyval == Gdk.KEY_Return):
-                    if self.settings.get_boolean('mouse-multi-select') and self.selection:
-                        self.copy_and_quit()
-                    else:
-                        self.copy_and_quit(focused_button)
-
+                if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+                    self.insert(focused_button)
                     return True
                 elif (not is_modifier) and (len(keyval_name) == 1) and re.match(r'\S', keyval_name):
                     self.search_entry.insert_text(keyval_name, -1)
@@ -437,75 +382,36 @@ class Picker(Gtk.ApplicationWindow):
         return False
 
     def handle_skintone_selector_key_press(self, controller: Gtk.EventController, keyval: int, keycode: int, state: Gdk.ModifierType) -> bool:
-        shift_key = bool(state & Gdk.ModifierType.SHIFT_MASK)
-        focused_widget: Gtk.FlowBoxChild = self.skintone_selector.get_focus()
-
-        self.shift_key_pressed = (keyval == Gdk.KEY_Shift_L) or (keyval == Gdk.KEY_Shift_R)
-
-        if shift_key:
-            self.shift_key_pressed = True
-            if (keyval == Gdk.KEY_Return):
-                self.select_emoji_button(focused_widget.get_child())
-                return True
-
-            elif (keyval == Gdk.KEY_BackSpace):
-                self.deselect_last_selected_emoji()
-
-                return True
-        else:
-            if (keyval == Gdk.KEY_Return):
-                self.skintone_selector.request_close()
-                self.copy_and_quit(focused_widget.get_child())
-                return True
+        if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+            shift_key = bool(state & Gdk.ModifierType.SHIFT_MASK)
+            focused_widget: Gtk.FlowBoxChild = self.skintone_selector.get_focus()
+            self.skintone_selector.request_close()
+            self.insert(focused_widget.get_child(), invert_close=shift_key)
+            return True
 
         return False
 
     def handle_search_entry_activate(self, entry: Gtk.Entry):
-        pass
-        # if self.query:
-        #     if self.list_model.get_n_items():
-        #         item: EmojiItem = self.list_model.get_item(0)
-        #         self.copy_and_quit(item.get_item().get_child())
+        # Enter in the search box inserts the first result (Shift+Enter: and inverts keep-open)
+        if entry.get_text().strip() and self.list_model.get_n_items():
+            item: EmojiItem = self.list_model.get_item(0)
+            button = EmojiButton()
+            button.emoji_data = item.emoji
+            button.hexcode = item.emoji['hexcode']
+            button.set_label(item.emoji['emoji'].strip())
+            self.update_emoji_button_skintone(button, item.skintone)
+            self.insert(button, invert_close=self.shift_held())
 
-    def handle_search_entry_keypress(self,  q, w, e, r):
-        if w == Gdk.KEY_Escape:
-            self.default_hiding_action(paste_on_exit=False)
+    def handle_search_entry_keypress(self, controller, keyval, keycode, state):
+        if keyval == Gdk.KEY_Escape:
+            self.default_hiding_action()
             return True
         return False
 
-    def send_paste_signal(self):
-        if not self.settings.get_boolean('auto-paste') or not self.last_copied_text:
-            return
-
-        if DbusService.dbus_connection:
-            if DbusService.extension_status == 'installed':
-                DbusService.dbus_connection.emit_signal(None, DBUS_SERVICE_PATH, DBUS_SERVICE_INTERFACE, 
-                                                        'CopiedEmoji', GLib.Variant('(s)', (self.last_copied_text,)))
-            else:
-                DbusService.dbus_connection.emit_signal(None, DBUS_SERVICE_PATH, DBUS_SERVICE_INTERFACE, 
-                                                        'CopiedEmojiBroadcast', GLib.Variant('(s)', (self.last_copied_text,)))
-        elif os.getenv('XDG_SESSION_TYPE') != 'wayland':
-            subprocess.check_output(['xdotool', 'key', 'ctrl+v'])
-
-    def default_hiding_action(self, paste_on_exit=True):
+    def default_hiding_action(self):
         self.search_entry.set_text('')
-        self.select_buffer_label.set_text('')
-        self.select_buffer_revealer.set_reveal_child(False)
-        self.selection = []
-        self.set_empty_recent_tip(None)
-        self.selected_buttons = []
-
-        if self.settings.get_boolean('iconify-on-esc'):
-            self.minimize()
-            if paste_on_exit: self.send_paste_signal()
-        elif not self.settings.get_boolean('load-hidden-on-startup'):
-            self.send_paste_signal()
-            self.hide()
-            self.close()
-        else:
-            self.set_visible(False)
-            if paste_on_exit: 
-                self.send_paste_signal()
+        self.set_empty_recent_tip(False)
+        self.overlay_ctl.hide()
 
     # # # # # #
     def show_skintone_selector(self, focused_widget: EmojiButton):
@@ -534,35 +440,12 @@ class Picker(Gtk.ApplicationWindow):
         self.list_tip_revealer.set_visible(enabled)
         self.list_tip_revealer.set_reveal_child(enabled)
 
-    def update_selection_content(self, selection: list[str] = []):
-        if selection:
-            self.select_buffer_label.set_label(''.join(selection))
-        else:
-            self.select_buffer_label.set_label('')
-
-        self.select_buffer_revealer.set_reveal_child(True if selection else False)
-
     def set_active_category(self, category: str):
         for b in self.category_picker_widgets:
             if b.category != category:
                 b.get_style_context().remove_class('selected')
             else:
                 b.get_style_context().add_class('selected')
-
-    def select_emoji_button(self, button: EmojiButton):
-        self.selected_buttons.append(button)
-        self.selection.append(button.get_label())
-        self.update_selection_content(self.selection)
-        increment_emoji_usage_counter(button)
-
-    def deselect_last_selected_emoji(self):
-        if not self.selection:
-            return
-
-        self.selection.pop()
-        self.selected_buttons.pop()
-
-        self.update_selection_content(self.selection)
 
     def filter_for_category(self, widget: Gtk.Button):
         self.set_active_category(widget.category)
@@ -575,31 +458,6 @@ class Picker(Gtk.ApplicationWindow):
         self.set_empty_recent_tip(show_empty_recent_tip)
 
         self.refresh_emoji_list()
-
-    def copy_and_quit(self, button: Optional[EmojiButton] = None):
-        text = ''
-        if button:
-            text = button.get_label()
-            increment_emoji_usage_counter(button)
-
-        copied_text = ''.join([*self.selection, text])
-        if os.getenv('XDG_SESSION_TYPE') == 'wayland':
-            subprocess.run(['wl-copy', copied_text])
-        else:
-            contx = Gdk.ContentProvider.new_for_value(copied_text)
-            self.clipboard.set_content(contx)
-
-        self.last_copied_text = copied_text
-
-        if self.settings.get_boolean('is-first-run'):
-            notification = Gio.Notification.new(_('Copied!'))
-            notification.set_body(_("I have copied the emoji to the clipboard. You can now paste it in any input field."))
-            notification.set_icon(Gio.ThemedIcon.new('dialog-information'))
-
-            Gio.Application.get_default().send_notification('copy-message', notification)
-            self.settings.set_boolean('is-first-run', False)
-
-        self.default_hiding_action()
 
     @debounce(0.1)
     @idle
@@ -648,6 +506,7 @@ class Picker(Gtk.ApplicationWindow):
     def on_setup(self, factory, list_item):
         # Called once to create the widget template
         btn = EmojiButton()
+        btn.connect('clicked', self.handle_emoji_button_click)
         list_item.set_child(btn)
 
 
@@ -661,6 +520,5 @@ class Picker(Gtk.ApplicationWindow):
         emoji_button.emoji_data = emoji_data
         emoji_button.hexcode = emoji_data['hexcode']
         emoji_button.set_label(item.emoji['emoji'].strip())
-        emoji_button.connect('clicked', self.handle_emoji_button_click)
         self.update_emoji_button_skintone(emoji_button, item.skintone)
         self.emoji_button_update_css_classes(emoji_button)

@@ -1,136 +1,107 @@
 import sys
 import gi
 
-from .utils import make_option, portal
-from .Picker import Picker
-from .ShortcutsWindow import ShortcutsWindow
-from .Settings import Settings
-from .components.UpdateDialog import UpdateDialog
-from .lib.DbusService import DbusService, GNOME_EXTENSION_LINK
-
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 
 from gi.repository import Gtk, Gio, Gdk, Adw, GLib  # noqa
 
+from .utils import make_option
+from .Picker import Picker
+from .ShortcutsWindow import ShortcutsWindow
+from .Settings import Settings
+from .hotkey_x11 import HotkeyDaemon
 
-class Smile(Adw.Application):
+APP_ID = 'local.winpanel.Smile'
+
+
+class SmilePanel(Adw.Application):
+    """Single-instance (D-Bus unique name) resident application.
+
+    Remote actions: `app.toggle`, `app.show`, `app.hide` (also reachable through
+    org.freedesktop.Application.ActivateAction, which the launcher's fast path uses).
+    """
+
     def __init__(self, **kwargs) -> None:
-        self.application_id = "it.mijorus.smile"
-        super().__init__(application_id=self.application_id, flags=Gio.ApplicationFlags.FLAGS_NONE)
-
-        entries = [
-            make_option('start-hidden'),
-            make_option('version')
-        ]
-
-        self.add_main_option_entries(entries)
-
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+        self.add_main_option_entries([
+            make_option('toggle', description='Show/hide the panel (starts it if needed)'),
+            make_option('daemon', description='Run resident in the background with the global hotkey'),
+            make_option('version', description='Print version'),
+        ])
         self.datadir = kwargs['datadir']
         self.version = kwargs['version']
-        self.last_about_key_pressed = None
-        self.about = None
+        self.window: Picker | None = None
+        self.hotkeys: HotkeyDaemon | None = None
         self.start_hidden = False
-        self.window = None
 
     def do_handle_local_options(self, options):
         if options.contains('version'):
             print(self.version)
             return 0
 
-        self.start_hidden = options.contains('start-hidden')
+        self.register(None)
+        if self.get_is_remote():
+            if options.contains('daemon'):
+                print('smile-panel is already running', file=sys.stderr)
+            else:
+                self.activate_action('toggle' if options.contains('toggle') else 'show', None)
+            return 0
+
+        self.start_hidden = options.contains('daemon')
         return -1
 
     def do_startup(self):
         Adw.Application.do_startup(self)
+        self.hold()  # stay resident while the panel is hidden
 
         css_provider = Gtk.CssProvider()
-        css_provider.load_from_resource('/it/mijorus/smile/assets/style.css')
+        css_provider.load_from_resource('/local/winpanel/Smile/assets/style.css')
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        self.settings = Gio.Settings.new(self.application_id)
+        self.settings = Gio.Settings.new(APP_ID)
+
+        self.create_action('toggle', lambda *_: self.panel().overlay_ctl.toggle())
+        self.create_action('show', lambda *_: self.panel().overlay_ctl.show())
+        self.create_action('hide', lambda *_: self.panel().overlay_ctl.hide())
+        self.create_action('preferences', lambda *_: Settings(APP_ID, transient_for=self.window).present())
+        self.create_action('open_shortcuts', lambda *_: ShortcutsWindow().open())
+        self.create_action('about', self.on_about_action)
+        self.create_action('quit', lambda *_: self.quit())
+        self.set_accels_for_action('app.quit', ['<Ctrl>q'])
+
+    def panel(self) -> Picker:
+        if not self.window:
+            self.window = Picker(application=self)
+        return self.window
 
     def do_activate(self):
-        # We only allow a single window and raise any existing ones
-        if not self.window:
-            # Windows are associated with the application
-            # when the last one is closed the application shuts down
-            self.window = Picker(application=self)
-
-            self.create_action("preferences", lambda w, e: self.on_preferences_action())
-            self.create_action("open_shortcuts", lambda w, e: ShortcutsWindow().open())
-            self.create_action("open_changelog", lambda w, e: Gtk.UriLauncher.new('https://smile.mijorus.it/changelog').launch())
-            self.create_action("translate", lambda w, e: Gtk.UriLauncher.new('https://github.com/mijorus/smile/tree/master/po').launch())
-            self.create_action("gnome_extension", lambda w, e: Gtk.UriLauncher.new(GNOME_EXTENSION_LINK).launch())
-
-            self.create_action("about", self.on_about_action)
-            self.create_action("quit", self.on_quit_action)
-
-            # Set up accelerators according to GNOME conventions
-            self.set_accels_for_action("app.quit", ["<Ctrl>q"])
-
-            if not self.start_hidden:
-                self.window.show()
-                self.window.on_activation()
-
-                last_run_version = self.settings.get_string('last-run-version').replace('.', '')
-                last_run_version = int(last_run_version if len(last_run_version) else '-1')
-
-                UpdateDialog.show(self.window, last_run_version, self.version)
-
-                self.settings.set_string('last-run-version', self.version)
-
+        panel = self.panel()
+        if self.start_hidden:
+            panel.overlay_ctl.prepare()
+            self.start_hidden = False  # only the very first activation of --daemon stays hidden
+            self.hotkeys = HotkeyDaemon(lambda: GLib.idle_add(self.activate_action, 'toggle', None))
+            self.hotkeys.start()
         else:
-            self.window.set_visible(True)
-            self.window.on_activation()
-
-    def on_preferences_action(self):
-        pref_window = Settings(self.application_id, transient_for=self.window)
-        pref_window.present()
+            panel.overlay_ctl.show()
 
     def create_action(self, name, callback):
-        """ Add an Action and connect to a callback """
         action = Gio.SimpleAction.new(name, None)
-        action.connect("activate", callback)
+        action.connect('activate', callback)
         self.add_action(action)
 
-    def on_about_action(self, widget, event):
-        self.about = Adw.AboutWindow(
+    def on_about_action(self, *_):
+        about = Adw.AboutWindow(
             version=self.version,
-            comments='An emoji picker',
-            application_name='Smile',
-            application_icon='it.mijorus.smile',
-            developer_name='Lorenzo Paderi',
-            website='https://smile.mijorus.it',
-            issue_url='https://github.com/mijorus/smile',
-            debug_info='Type the answer to life, the universe, and everything',
+            comments='Windows-style emoji panel for X11 — fork of SMILE',
+            application_name='Smile Panel',
+            application_icon=APP_ID,
+            developer_name='Fork of SMILE by Lorenzo Paderi',
             copyright='(C) 2022 Lorenzo Paderi\n\nLocalized tags by milesj/emojibase, licensed under the MIT License',
+            transient_for=self.window,
         )
+        about.add_credit_section('Icon by', ['Roman Morozov'])
+        about.present()
 
-        event_controller_keys = Gtk.EventControllerKey()
-        event_controller_keys.connect('key-pressed', self.on_about_key_pressed)
-        self.about.add_controller(event_controller_keys)
 
-        self.about.set_translator_credits(_("translator_credits"))
-        self.about.add_credit_section('Icon by', ['Roman Morozov'])
-
-        self.about.set_transient_for(self.props.active_window)
-        self.about.present()
-
-    def on_about_key_pressed(self, controller, keyval, keycode, state):
-        if (self.last_about_key_pressed == '4') and (Gdk.keyval_name(keyval) == '2'):
-            self.about.set_application_icon('it.mijorus.smile.crazy')
-
-        self.last_about_key_pressed = Gdk.keyval_name(keyval)
-
-    def on_quit_action(self, widget, event):
-        if self.window:
-            self.window.close()
-        self.quit()
-
-def main(version: str, datadir: str) -> None:
-    app = Smile(version=version, datadir=datadir)
-
-    dbus_service = DbusService()
-    dbus_service.connect()
-
-    app.run(sys.argv)
+def main(version: str, datadir: str) -> int:
+    return SmilePanel(version=version, datadir=datadir).run(sys.argv)

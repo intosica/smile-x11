@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=local.winpanel.Smile
+Exec=@bindir@/smile-panel --daemon

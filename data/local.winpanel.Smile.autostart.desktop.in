@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Smile Panel hotkey daemon
+Comment=Global Super+. / Super+; hotkey for Smile Panel
+Exec=smile-panel --daemon
+Icon=local.winpanel.Smile
+Terminal=false
+Type=Application
+X-GNOME-Autostart-enabled=true
+NoDisplay=true

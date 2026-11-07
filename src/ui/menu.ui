@@ -11,20 +11,12 @@
                 <attribute name="action">app.open_shortcuts</attribute>
             </item>
             <item>
-                <attribute name="action">app.open_changelog</attribute>
-                <attribute name="label" translatable="yes">What's new?</attribute>
-            </item>
-            <item>
-                <attribute name="action">app.gnome_extension</attribute>
-                <attribute name="label" translatable="yes">Install GNOME extension</attribute>
-            </item>
-            <item>
-                <attribute name="action">app.translate</attribute>
-                <attribute name="label" translatable="yes">Translate this app</attribute>
-            </item>
-            <item>
                 <attribute name="label" translatable="yes">About</attribute>
                 <attribute name="action">app.about</attribute>
+            </item>
+            <item>
+                <attribute name="label" translatable="yes">Quit</attribute>
+                <attribute name="action">app.quit</attribute>
             </item>
         </section>
     </menu>

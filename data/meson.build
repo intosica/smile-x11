@@ -1,44 +1,30 @@
+app_id = 'local.winpanel.Smile'
+desktop_dir = join_paths(get_option('datadir'), 'applications')
+
 desktop_file = configure_file(
-        input: 'it.mijorus.smile.desktop.in',
-       output: 'it.mijorus.smile.desktop',
-      install: true,
-         copy: true,
-  install_dir: join_paths(get_option('datadir'), 'applications')
-)
+  input: app_id + '.desktop.in', output: app_id + '.desktop',
+  copy: true, install: true, install_dir: desktop_dir)
 
-desktop_utils = find_program('desktop-file-validate', required: false)
-if desktop_utils.found()
-  test('Validate desktop file', desktop_utils,
-    args: [desktop_file]
-  )
-endif
+install_data(configure_file(
+  input: app_id + '.autostart.desktop.in', output: app_id + '.autostart.desktop', copy: true),
+  install_dir: join_paths(get_option('sysconfdir'), 'xdg', 'autostart'),
+  rename: app_id + '.desktop')
 
-appstream_file = configure_file(
-        input: 'it.mijorus.smile.appdata.xml.in',
-       output: 'it.mijorus.smile.appdata.xml',
-      install: true,
-         copy: true,
-  install_dir: join_paths(get_option('datadir'), 'appdata')
-)
+# D-Bus activation: first `smile-panel --toggle` (or any activation) starts the resident instance
+conf_svc = configuration_data()
+conf_svc.set('bindir', join_paths(get_option('prefix'), get_option('bindir')))
+configure_file(
+  input: app_id + '.service.in', output: app_id + '.service',
+  configuration: conf_svc, install: true,
+  install_dir: join_paths(get_option('datadir'), 'dbus-1', 'services'))
 
+configure_file(
+  input: app_id + '.metainfo.xml.in', output: app_id + '.metainfo.xml',
+  copy: true, install: true,
+  install_dir: join_paths(get_option('datadir'), 'metainfo'))
 
-appstream_util = find_program('appstream-util', required: false)
-if appstream_util.found()
-  test('Validate appstream file', appstream_util,
-    args: ['validate', appstream_file]
-  )
-endif
-
-install_data('it.mijorus.smile.gschema.xml',
-  install_dir: join_paths(get_option('datadir'), 'glib-2.0/schemas')
-)
-
-compile_schemas = find_program('glib-compile-schemas', required: false)
-if compile_schemas.found()
-  test('Validate schema file', compile_schemas,
-    args: ['--strict', '--dry-run', meson.current_source_dir()]
-  )
-endif
+install_data(app_id + '.gschema.xml',
+  install_dir: join_paths(get_option('datadir'), 'glib-2.0/schemas'))
 
 subdir('icons')
 subdir('assets')

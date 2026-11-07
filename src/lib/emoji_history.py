@@ -2,7 +2,7 @@ from time import time
 from .user_config import read_json_config, save_json_config
 from ..components.EmojiButton import EmojiButton
 
-def increment_emoji_usage_counter(button: EmojiButton):
+def increment_emoji_usage_counter(button: EmojiButton):  # duck-typed: needs .hexcode
     max_history_size = 30
     
     emoji_hexcode = button.hexcode

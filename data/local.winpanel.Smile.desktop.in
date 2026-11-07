@@ -1,0 +1,16 @@
+[Desktop Entry]
+Name=Smile Panel
+Comment=Windows-style emoji panel
+Exec=smile-panel
+Icon=local.winpanel.Smile
+Terminal=false
+Type=Application
+Categories=Utility;GTK;
+StartupNotify=false
+Keywords=Emoji;Picker;
+DBusActivatable=true
+Actions=Toggle;
+
+[Desktop Action Toggle]
+Name=Toggle panel
+Exec=smile-panel --toggle

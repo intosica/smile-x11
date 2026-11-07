@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="smile-panel">
+    <schema id="local.winpanel.Smile" path="/local/winpanel/Smile/">
+        <key name="keep-open-after-insert" type="b">
+            <default>true</default>
+            <summary>Keep the panel open after inserting an emoji</summary>
+            <description>Shift+Enter / Shift+Click inverts this for a single insertion.</description>
+        </key>
+        <key name="skintone-modifier" type="s"><default>""</default></key>
+        <key name="haircut-modifier" type="s"><default>""</default></key>
+        <key name="tags-locale" type="s"><default>"en"</default></key>
+        <key name="merge-english-tags" type="b"><default>true</default></key>
+        <key name="use-localized-tags" type="b"><default>false</default></key>
+        <key name="emoji-size-class" type="s"><default>"emoji-button"</default></key>
+        <key name="key-delay-ms" type="i">
+            <default>8</default>
+            <summary>Delay in ms between keymap remap and key events (XTest)</summary>
+        </key>
+    </schema>
+</schemalist>

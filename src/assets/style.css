@@ -26,20 +26,20 @@
 }
 
 .flowbox-child-custom:focus button {
-    border-color: var(--accent-color);
-    box-shadow: 0px 0px 2px 1px var(--accent-color);
+    border-color: @accent_color;
+    box-shadow: 0px 0px 2px 1px @accent_color;
     outline: transparent;
 }
 
 .flowbox-child-custom.active button {
-    border-color: var(--accent-color);
-    box-shadow: 0px 0px 2px 1px var(--accent-color);
+    border-color: @accent_color;
+    box-shadow: 0px 0px 2px 1px @accent_color;
     outline: transparent;
 }
 
 .flowbox-child-custom.selected button {
-    border-color: var(--accent-bg-color);
-    box-shadow: 0px 0px 2px 1px var(--accent-bg-color);
+    border-color: @accent_bg_color;
+    box-shadow: 0px 0px 2px 1px @accent_bg_color;
     outline: transparent;
 }
 
@@ -56,15 +56,15 @@
 }
 
 /* #emoji_categories_box button:focus {
-    border-bottom-color: var(--accent-color);
-    box-shadow: 0px 3px 0px 0px var(--accent-color);
+    border-bottom-color: @accent_color;
+    box-shadow: 0px 3px 0px 0px @accent_color;
     outline: transparent;
     border-radius: 0;
 } */
 
 #emoji_categories_box button.selected {
-    border-bottom-color: var(--accent-color);
-    box-shadow: 0px 3px 0px 0px var(--accent-color);
+    border-bottom-color: @accent_color;
+    box-shadow: 0px 3px 0px 0px @accent_color;
     outline: transparent;
     border-radius: 0;
 }
@@ -95,3 +95,5 @@
 .solid-overlay {
     background-color: @window_bg_color;
 }
+/* overlay density */
+.panel-topbar { padding: 6px 6px 2px 6px; }
