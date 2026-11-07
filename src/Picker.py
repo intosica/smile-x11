@@ -272,7 +272,7 @@ class Picker(Gtk.ApplicationWindow):
         """Type the emoji into the target app via XTest (never the clipboard)."""
         text = button.get_label()
         try:
-            input_x11.type_text(text)
+            input_x11.type_text(text, self.settings.get_int('key-delay-ms'))
         except input_x11.InjectionError as e:
             notification = Gio.Notification.new(_('Could not insert emoji'))
             notification.set_body(str(e))
