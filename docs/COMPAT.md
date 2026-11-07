@@ -82,3 +82,43 @@ Overlay behaviour (tests/run_overlay_xephyr.sh): openbox, fluxbox, icewm all pas
   DE shortcut already uses them, remove it or use `smile-panel --toggle` from the DE's shortcut editor.
 * When the DE/WM owns the shortcut, the daemon process is still required only for fast startup; the D-Bus
   service file starts it on demand.
+
+## Phase 5 — tabs, clipboard history, skin tones (tests/test_phase5.py, tests/run_phase5_xephyr.sh)
+
+Xephyr 1280x800 + openbox, GTK4 text sink as the target, isolated `XDG_CONFIG_HOME`/`XDG_DATA_HOME`,
+`dbus-run-session`. All checks pass (15/15), twice in a row.
+
+| Check | Result | Notes |
+|---|---|---|
+| panel opens on `--toggle`, search focused | pass | |
+| `Tab`/`Shift+Tab` cycle Emoji → Kaomoji → Symbols → Clipboard | pass | capture-phase key controller; `GtkSearchEntry` does not see Tab |
+| search + `Enter` on Kaomoji (`shrug`) | pass | types `¯\_(ツ)_/¯` |
+| search + `Enter` on Symbols (`arrow`) | pass | types `←` (10-column grid, Unicode-name search) |
+| clipboard entry picked with `Enter` | pass | types `VISIBLE-MARK` |
+| clipboard is not written back by inserting | pass | owner still serves the original bytes |
+| password-manager clip is never recorded | pass | `x-kde-passwordManagerHint` property; flag visibility asserted separately |
+| `Escape` after cycling tabs closes | pass | |
+| `Shift+Enter` inserts and closes | pass | inverts `keep-open-after-insert=true` |
+| skin-tone pick remembers the tone | pass | `skintone_memory.json` gains `1F44B` after picking 👋🏻 |
+| usage recorded under the **base** hexcode | pass | `usage_history.json` key has no `-1F3FB` suffix |
+| CLIPBOARD and PRIMARY byte-identical after all insertions | pass | `xclip -o` compared with the live owners |
+
+Anomalies found while testing:
+* `GtkText` inside `GtkSearchEntry` consumes `Up`/`Down` for caret movement before the bubble-phase
+  window controller sees them, so the "arrow into the grid" handler runs in the **capture** phase.
+* On X11 `Gdk.Clipboard.get_formats()` is empty for a moment after `changed` fires; the page therefore
+  reads text directly instead of gating on `formats` (a gate made the first clip after startup flaky).
+* Gdk does not expose `x-kde-passwordManagerHint` in `get_formats()` even when the owner advertises it as
+  a target, so the KDE property on the selection owner window is the reliable check
+  (`tests/fake_password_manager.py` reproduces a KeePassXC-style owner).
+* `Gtk.main_iteration_do()` does not exist in GTK4; clipboard-owning test helpers must pump
+  `GLib.MainContext.default().iteration(False)`.
+
+### Phase 5 timings
+
+| Action | Measured |
+|---|---|
+| open panel (`smile-panel --toggle`, D-Bus fast path) | 31–86 ms (median 35 ms) |
+| 4 emoji sequences typed via XTest | 70–85 ms total |
+| tab switch + filter | < 30 ms perceived |
+| clipboard read + history insert | one idle round trip (not user visible) |

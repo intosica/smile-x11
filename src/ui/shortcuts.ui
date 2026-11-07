@@ -111,14 +111,21 @@
                             <object class="GtkShortcutsShortcut">
                                 <property name="visible">True</property>
                                 <property name="accelerator">Return</property>
-                                <property name="title" translatable="yes">Copy the selected emoji and hide the window (When an emoji is highlighted)</property>
+                                <property name="title" translatable="yes">Insert the highlighted item and keep the panel open</property>
                             </object>
                         </child>
                         <child>
                             <object class="GtkShortcutsShortcut">
                                 <property name="visible">True</property>
-                                <property name="accelerator">Return</property>
-                                <property name="title" translatable="yes">Copy first emoji and hide the window (When using the search bar)</property>
+                                <property name="accelerator">&lt;shift&gt;Return</property>
+                                <property name="title" translatable="yes">Insert and close the panel (inverts "keep open after insert")</property>
+                            </object>
+                        </child>
+                        <child>
+                            <object class="GtkShortcutsShortcut">
+                                <property name="visible">True</property>
+                                <property name="accelerator">Down</property>
+                                <property name="title" translatable="yes">Move from the search bar into the results, then navigate with the arrow keys</property>
                             </object>
                         </child>
                         <child>
@@ -138,23 +145,15 @@
                         <child>
                             <object class="GtkShortcutsShortcut">
                                 <property name="visible">True</property>
-                                <property name="accelerator">&lt;shift&gt;Return</property>
-                                <property name="title" translatable="yes">Add an emoji to selection</property>
-                            </object>
-                        </child>
-
-                        <child>
-                            <object class="GtkShortcutsShortcut">
-                                <property name="visible">True</property>
-                                <property name="accelerator">&lt;shift&gt;BackSpace</property>
-                                <property name="title" translatable="yes">Remove the last emoji from the selection</property>
+                                <property name="accelerator">Tab</property>
+                                <property name="title" translatable="yes">Switch to the next tab (Emoji, Kaomoji, Symbols, Clipboard)</property>
                             </object>
                         </child>
                         <child>
                             <object class="GtkShortcutsShortcut">
                                 <property name="visible">True</property>
-                                <property name="accelerator">&lt;ctrl&gt;Return</property>
-                                <property name="title" translatable="yes">Copy the selection and hide the window, without the highlighted emoji</property>
+                                <property name="accelerator">&lt;shift&gt;Tab</property>
+                                <property name="title" translatable="yes">Switch to the previous tab</property>
                             </object>
                         </child>
                         <child>
@@ -169,6 +168,20 @@
                                 <property name="visible">True</property>
                                 <property name="accelerator">&lt;alt&gt;T</property>
                                 <property name="title" translatable="yes">Add a custom tag</property>
+                            </object>
+                        </child>
+                        <child>
+                            <object class="GtkShortcutsShortcut">
+                                <property name="visible">True</property>
+                                <property name="accelerator">Escape</property>
+                                <property name="title" translatable="yes">Close the panel</property>
+                            </object>
+                        </child>
+                        <child>
+                            <object class="GtkShortcutsShortcut">
+                                <property name="visible">True</property>
+                                <property name="accelerator">&lt;super&gt;period</property>
+                                <property name="title" translatable="yes">Show or hide the panel (global shortcut, while smile-panel --daemon runs)</property>
                             </object>
                         </child>
                         <child>

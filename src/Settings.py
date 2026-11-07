@@ -30,6 +30,16 @@ class Settings(Adw.PreferencesWindow):
         )
         general_group.add(self.create_launch_shortcut_settings_entry())
 
+        clipboard_group = Adw.PreferencesGroup(
+            title=_('Clipboard history'),
+            description=_('The Clipboard tab only <b>reads</b> your clipboard to build a list. Picking an entry types it into the window you are in; your clipboard is never modified. Entries flagged by password managers are skipped.<br/>Persistence writes <b>unencrypted</b> text to <tt>~/.local/share/smile-panel/clipboard_history.json</tt> (only your user can read it).'))
+        clipboard_group.add(self.create_boolean_settings_entry(
+            _('Enable clipboard history'), 'clipboard-history-enabled',
+            _('List copied text in the Clipboard tab (read-only monitoring)')))
+        clipboard_group.add(self.create_boolean_settings_entry(
+            _('Save history to disk'), 'clipboard-persist',
+            _('Off by default. Writes copied text unencrypted to your home directory, also across reboots')))
+
         # Customization group
         customization_group = Adw.PreferencesGroup(title=_('Customization'))
         customization_group.add(self.create_modifiers_combo_boxes())
@@ -50,7 +60,7 @@ class Settings(Adw.PreferencesWindow):
         ]
 
         [self.localized_tags_group.add(item) for item in self.localized_tags_group_items]
-        [self.page1.add(el) for el in [general_group, customization_group, self.localized_tags_group]]
+        [self.page1.add(el) for el in [general_group, clipboard_group, customization_group, self.localized_tags_group]]
 
         # Page 2
         self.page2 = Adw.PreferencesPage(title=_('Custom tags'), icon_name='smile-symbolic')

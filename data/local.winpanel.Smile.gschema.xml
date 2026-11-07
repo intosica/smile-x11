@@ -12,6 +12,16 @@
         <key name="merge-english-tags" type="b"><default>true</default></key>
         <key name="use-localized-tags" type="b"><default>false</default></key>
         <key name="emoji-size-class" type="s"><default>"emoji-button"</default></key>
+        <key name="clipboard-history-enabled" type="b">
+            <default>true</default>
+            <summary>Keep a clipboard history in the Clipboard tab</summary>
+            <description>Read-only monitoring: copied text is listed here, and picking an entry types it (X11 XTest) without touching the clipboard. Nothing is ever written to the clipboard.</description>
+        </key>
+        <key name="clipboard-persist" type="b">
+            <default>false</default>
+            <summary>Save the clipboard history on disk</summary>
+            <description>Off by default. When on, the copied texts kept in the history list (never your clipboard itself) are written unencrypted to $XDG_DATA_HOME/smile-panel/clipboard_history.json, readable by your user only (0600). Password-manager entries are always skipped.</description>
+        </key>
         <key name="key-delay-ms" type="i">
             <default>8</default>
             <summary>Delay in ms between keymap remap and key events (XTest)</summary>

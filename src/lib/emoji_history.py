@@ -1,28 +1,32 @@
 from time import time
 from .user_config import read_json_config, save_json_config
-from ..components.EmojiButton import EmojiButton
 
-def increment_emoji_usage_counter(button: EmojiButton):  # duck-typed: needs .hexcode
-    max_history_size = 30
-    
-    emoji_hexcode = button.hexcode
-    history = read_json_config('usage_history')
-
-    if not emoji_hexcode in history:
-        history[emoji_hexcode] = {}
-        history[emoji_hexcode]['count'] = 0
+MAX_HISTORY = 200  # Recents shows the newest 30, Frequently used the 30 most used
 
 
-    history[emoji_hexcode]['count'] += 1
-    history[emoji_hexcode]['lastUsage'] = round(time())
-    
-    if (len(history) > max_history_size):
-        sorted_h = dict( sorted(history.items(), key=lambda kv:kv[1]['lastUsage']) )
-        older_key = [*sorted_h][0]
-        del history[older_key]
+def record_usage(key: str, filename: str = 'usage_history'):
+    """Count one use of ``key`` (emoji hexcode, kaomoji or symbol text) in config/<filename>.json."""
+    history = read_json_config(filename) or {}
+    entry = history.setdefault(key, {'count': 0})
+    entry['count'] += 1
+    entry['lastUsage'] = time()
 
-    save_json_config(history, 'usage_history')
+    if len(history) > MAX_HISTORY:
+        del history[min(history, key=lambda k: history[k]['lastUsage'])]
+
+    save_json_config(history, filename)
 
 
-def get_history() -> dict:
-    return read_json_config('usage_history')
+def get_history(filename: str = 'usage_history') -> dict:
+    return read_json_config(filename) or {}
+
+
+def get_skintone_memory() -> dict:
+    """base emoji hexcode -> skintone modifier ('' = no tone) chosen last time for that emoji."""
+    return read_json_config('skintone_memory') or {}
+
+
+def remember_skintone(base_hexcode: str, modifier: str):
+    memory = get_skintone_memory()
+    memory[base_hexcode] = modifier
+    save_json_config(memory, 'skintone_memory')
