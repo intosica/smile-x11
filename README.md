@@ -66,7 +66,7 @@ login:
 
 ```sh
 mkdir -p ~/.config/autostart
-cp data/local.winpanel.Smile.autostart.desktop ~/.config/autostart/
+cp build/data/local.winpanel.Smile.autostart.desktop ~/.config/autostart/local.winpanel.Smile.desktop
 ```
 
 ## Usage
