@@ -38,5 +38,7 @@ if __name__ == '__main__':
     from gi.repository import Gio
     Gio.Resource.load(os.path.join(pkgdatadir, 'smile-panel.gresource'))._register()
 
+    import logging
+    logging.basicConfig(level=logging.DEBUG if os.environ.get("SMILE_DEBUG") else logging.INFO, format="%(name)s: %(message)s")
     from smile_panel import main
     sys.exit(main.main(VERSION, pkgdatadir))

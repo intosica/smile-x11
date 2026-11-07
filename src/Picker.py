@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 import gi
 import re
 from typing import Optional
@@ -29,7 +30,7 @@ from .lib.localized_tags import get_localized_tags
 from .lib.emoji_history import increment_emoji_usage_counter, get_history
 from .utils import tag_list_contains, debounce, idle
 from .window_x11 import OverlayController
-from . import input_x11
+from . import input_x11  # noqa: F401  (InjectionError)
 from .assets.emoji_list import emojis, emoji_categories
 
 gi.require_version('Gtk', '4.0')
@@ -41,6 +42,8 @@ class Picker(Gtk.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(title="Smile Panel", *args, **kwargs)
         self.overlay_ctl = OverlayController(self)
+        self.overlay_ctl.on_shown = lambda: self.set_focus(self.search_entry)
+        self.overlay_ctl.on_hidden = self.reset_state
 
         self.EMOJI_GRID_COL_N = 5
 
@@ -141,11 +144,6 @@ class Picker(Gtk.ApplicationWindow):
 
         self.set_child(self.overlay)
         self.search_entry.grab_focus()
-
-    def on_activation(self):
-        self.overlay_ctl.show()
-
-        self.set_focus(self.search_entry)
 
     # Create stuff
     def create_menu_button(self):
@@ -271,8 +269,9 @@ class Picker(Gtk.ApplicationWindow):
     def insert(self, button: EmojiButton, invert_close: bool = False):
         """Type the emoji into the target app via XTest (never the clipboard)."""
         text = button.get_label()
+        logging.getLogger("smile-panel").debug("insert %r", text)
         try:
-            input_x11.type_text(text, self.settings.get_int('key-delay-ms'))
+            self.overlay_ctl.insert_text(text, self.settings.get_int('key-delay-ms'))
         except input_x11.InjectionError as e:
             notification = Gio.Notification.new(_('Could not insert emoji'))
             notification.set_body(str(e))
@@ -406,12 +405,18 @@ class Picker(Gtk.ApplicationWindow):
         if keyval == Gdk.KEY_Escape:
             self.default_hiding_action()
             return True
+        if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and state & Gdk.ModifierType.SHIFT_MASK:
+            self.handle_search_entry_activate(self.search_entry)  # GtkText only activates on plain Enter
+            return True
         return False
 
     def default_hiding_action(self):
+        self.overlay_ctl.hide()
+
+    def reset_state(self):
+        """Runs on every hide (Esc, toggle, outside click, WM unmap)."""
         self.search_entry.set_text('')
         self.set_empty_recent_tip(False)
-        self.overlay_ctl.hide()
 
     # # # # # #
     def show_skintone_selector(self, focused_widget: EmojiButton):

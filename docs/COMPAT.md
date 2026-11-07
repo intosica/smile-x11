@@ -27,3 +27,27 @@ Clipboard + primary: byte-identical in every run.
 * Spare keycodes are found by scanning for all-`NoSymbol` keycodes that are not modifiers; up to 32 are
   held at once. Texts with more distinct characters are typed in rounds with a 30 ms settle between.
 * Held modifiers (Super from `Super+.`, Shift from Shift+Click) are fake-released before typing.
+
+## Phase 3 — overlay behaviour (tests/test_overlay_session.py)
+
+Run on a live X11 session (`tests/test_overlay_session.py`, needs a running `smile-panel --daemon`) and in an
+isolated Xephyr (`tests/run_overlay_xephyr.sh [wm]`). Both use a GTK4 text sink as target and compare
+CLIPBOARD/PRIMARY sentinels with `xclip -o`.
+
+| Check | GNOME Shell (mutter, X11) | Openbox (Xephyr) |
+|---|---|---|
+| panel opens near pointer, 360x480, UTILITY/ABOVE/SKIP_* | pass | pass |
+| 3 emoji clicks → 3 emoji typed, panel stays mapped | pass | pass |
+| click inside panel (empty grid) keeps it open | pass | pass |
+| click in other app closes it (XI2 raw button, no grab) | pass | pass |
+| Escape / `--toggle` close it | pass | pass |
+| search + Shift+Enter inserts first hit and closes | pass | pass |
+| clipboard + primary byte-identical | pass | pass |
+
+Anomalies found while testing:
+* Reparenting WMs: the X input focus sits on a *child* of the client window, so "target is focused" walks
+  the focus window's parent chain (`_focus_in`) instead of comparing it to the toplevel directly.
+* GTK4 drops key events that arrive before it processed FocusIn; insertion therefore waits for both
+  `_NET_ACTIVE_WINDOW` and `XGetInputFocus` to name the target (≤200 ms, then XSetInputFocus fallback).
+* GtkText only emits `activate` for plain Enter; Shift+Enter is handled in the key controller.
+* GTK4 creates hidden leader windows with the same title; test targets are picked by `WM_STATE`.
