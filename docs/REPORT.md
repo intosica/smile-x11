@@ -112,10 +112,11 @@ Details, per-target anomalies and hotkey conflicts: [COMPAT.md](COMPAT.md).
    combination reaches clients at all. Use IceWM's own key file.
 4. **GNOME/mutter and IBus own `Super+.`/`Super+;`.** The daemon cannot grab them there; the panel is
    started through the DE shortcut instead. This is the documented setup on the dev host.
-5. **Caret positioning is pointer-only on this host.** `pyatspi` is not installed and the AT-SPI bus is
-   not running; `window_x11.py` looks for an optional `caret_atspi` module and otherwise uses
-   `XQueryPointer` (panel opens slightly up-right of the cursor, clamped to the monitor work area).
-   The optional module was not implemented — the spec allowed degrading.
+5. **Caret positioning is untested on this host.** `src/caret_atspi.py` implements the optional AT-SPI
+   lookup (15 % time budget, walks the accessibility tree for the focused accessible with a text
+   interface, returns `getCharacterExtents(caretOffset)`), but `pyatspi` is not installed and the AT-SPI
+   bus is not running here, so every measurement used the `XQueryPointer` fallback (panel opens slightly
+   up-right of the cursor, clamped to the monitor work area).
 6. **Multi-line clipboard entries** type a real `Return` per newline, so picking a multi-line snippet in
    a terminal submits each line. Single-line entries are the intended case.
 7. **Terminals with bracketed paste / IME quirks** receive raw key events; emoji arrive as typed text
