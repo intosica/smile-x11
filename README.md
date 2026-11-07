@@ -51,6 +51,15 @@ sudo apt install python3-pyatspi at-spi2-core xclip
 
 ## Build and install
 
+One-shot (checks dependencies, builds, installs, sets up autostart):
+
+```sh
+./install.sh                                # per-user, ~/.local
+PREFIX=/usr SYSCONFDIR=/etc sudo -E ./install.sh   # system-wide
+```
+
+Or by hand:
+
 ```sh
 meson setup build --prefix="$HOME/.local"
 meson install -C build

@@ -8,7 +8,6 @@ builddir/
 flatpak-pip-generator.py
 .glade~
 .idea
-install.sh
 old_emoji_list.py
 po/*.mo
 problematic_emojis.cpython*
