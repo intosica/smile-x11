@@ -56,8 +56,18 @@ meson setup build --prefix="$HOME/.local"
 meson install -C build
 ```
 
-`--prefix` can be `/usr` for a system install. The launcher is a small shell script
+`--prefix` can be `/usr` for a system install (distributions should also pass
+`-Dsysconfdir=/etc`, which is where the autostart file goes). The launcher is a small shell script
 (`bin/smile-panel`) that starts the Python package from `$prefix/share/smile-panel`.
+
+A per-user install does not put the autostart entry in an XDG autostart directory; copy it yourself if you
+want `--daemon` (and with it the built-in `Super+.` grab for desktops that do not own the key) to start at
+login:
+
+```sh
+mkdir -p ~/.config/autostart
+cp data/local.winpanel.Smile.autostart.desktop ~/.config/autostart/
+```
 
 ## Usage
 
