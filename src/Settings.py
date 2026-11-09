@@ -9,7 +9,7 @@ from .lib.custom_tags import set_custom_tags, get_all_custom_tags, delete_custom
 from .lib.localized_tags import get_countries_list
 
 
-from gi.repository import Gtk, Gio, Gdk, GLib, Adw
+from gi.repository import Gtk, Gio, Gdk, GLib, Adw, Pango
 
 
 class Settings(Adw.PreferencesWindow):
@@ -44,6 +44,7 @@ class Settings(Adw.PreferencesWindow):
         customization_group = Adw.PreferencesGroup(title=_('Customization'))
         customization_group.add(self.create_modifiers_combo_boxes())
         customization_group.add(self.create_emoji_sizes_combo_boxes())
+        customization_group.add(self.create_emoji_font_row())
 
         self.localized_tags_group = Adw.PreferencesGroup(title=_('Localized tags'))
         self.localized_tags_group.add(
@@ -205,6 +206,40 @@ class Settings(Adw.PreferencesWindow):
 
         emoji_size_combo.connect('changed', lambda w: self.settings.set_string('emoji-size-class', w.get_active_id()))
         row.add_suffix(emoji_size_combo)
+        return row
+
+    def create_emoji_font_row(self) -> Adw.ActionRow:
+        row = Adw.ActionRow(title=_('Emoji font'))
+        label = Gtk.Label(valign=Gtk.Align.CENTER, ellipsize=Pango.EllipsizeMode.MIDDLE, max_width_chars=14)
+        choose = Gtk.Button(label=_('Choose…'), valign=Gtk.Align.CENTER)
+        reset = Gtk.Button(icon_name='edit-clear-symbolic', valign=Gtk.Align.CENTER, tooltip_text=_('Use the system font'), css_classes=['flat'])
+
+        def update(*args):
+            path = self.settings.get_string('emoji-font-file')
+            label.set_text(os.path.basename(path) if path else _('System'))
+            row.set_subtitle(_('Font file for drawing emoji in the panel, e.g. the iOS NotoColorEmoji.ttf'))
+            reset.set_sensitive(bool(path))
+
+        def on_chosen(dialog, res):
+            try:
+                self.settings.set_string('emoji-font-file', dialog.open_finish(res).get_path())
+            except GLib.Error:
+                pass
+
+        def on_choose(*args):
+            dialog = Gtk.FileDialog()
+            flt = Gtk.FileFilter(name=_('Fonts'))
+            [flt.add_suffix(s) for s in ('ttf', 'otf', 'ttc')]
+            filters = Gio.ListStore.new(Gtk.FileFilter)
+            filters.append(flt)
+            dialog.set_filters(filters)
+            dialog.open(self, None, on_chosen)
+
+        choose.connect('clicked', on_choose)
+        reset.connect('clicked', lambda *a: self.settings.set_string('emoji-font-file', ''))
+        self.settings.connect('changed::emoji-font-file', update)
+        update()
+        [row.add_suffix(w) for w in (label, choose, reset)]
         return row
 
     def create_tags_locale_combo_boxes(self) -> Adw.ActionRow:

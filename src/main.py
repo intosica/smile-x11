@@ -11,6 +11,7 @@ from .Picker import Picker
 from .ShortcutsWindow import ShortcutsWindow
 from .Settings import Settings
 from .hotkey_x11 import HotkeyDaemon
+from .lib import emoji_font
 
 APP_ID = 'local.winpanel.Smile'
 
@@ -59,6 +60,9 @@ class SmilePanel(Adw.Application):
         css_provider.load_from_resource('/local/winpanel/Smile/assets/style.css')
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.settings = Gio.Settings.new(APP_ID)
+        apply_font = lambda *_: emoji_font.apply(self.settings.get_string('emoji-font-file')) or print('smile-panel: cannot load emoji font', file=sys.stderr)
+        apply_font()
+        self.settings.connect('changed::emoji-font-file', apply_font)
 
         self.create_action('toggle', lambda *_: self.panel().overlay_ctl.toggle())
         self.create_action('show', lambda *_: self.panel().overlay_ctl.show())

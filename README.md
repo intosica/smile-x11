@@ -31,6 +31,22 @@ behaviour, and drops the Wayland/Flatpak code paths that cannot do the same thin
 | Emoji only | Emoji, Kaomoji, Symbols, Clipboard history tabs |
 | — | per-emoji skin-tone memory, Recents + Frequently used |
 
+## Screenshots
+
+| Emoji | Search | Kaomoji | Symbols |
+|---|---|---|---|
+| ![emoji](docs/screenshots/emoji.png) | ![search](docs/screenshots/search.png) | ![kaomoji](docs/screenshots/kaomoji.png) | ![symbols](docs/screenshots/symbols.png) |
+
+With the iOS emoji font (see [Emoji font](#emoji-font)) — Unicode 16/17 emoji such as 🫍 🪊 🫆 draw
+correctly instead of as empty boxes:
+
+| System font | iOS font | iOS font | Preferences |
+|---|---|---|---|
+| ![orca, system font](docs/screenshots/new-orca.png) | ![orca, iOS font](docs/screenshots/ios/new-orca.png) | ![fingerprint, iOS font](docs/screenshots/ios/new-fingerprint.png) | ![emoji font preference](docs/screenshots/ios/preferences-font.png) |
+
+Screenshots are reproducible: `tests/screenshots.py`, see [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)
+(also the protocol for agents).
+
 ## Requirements
 
 * X11/Xorg session (Wayland is not supported — XTest typing does not work there)
@@ -150,6 +166,7 @@ The **Clipboard** tab only *reads* the clipboard to build a history:
 | `clipboard-history-enabled` | `true` | monitor the clipboard for the Clipboard tab |
 | `clipboard-persist` | `false` | save the clipboard history to disk |
 | `skintone-modifier`, `haircut-modifier` | `""` | default tone, overridden per emoji |
+| `emoji-font-file` | `""` | colour emoji font file used to draw emoji in the panel (see [Emoji font](#emoji-font)) |
 | `emoji-size-class`, `tags-locale`, `merge-english-tags`, `use-localized-tags` | — | appearance and tag search |
 
 Per-emoji skin-tone choices and usage counters are kept in `~/.config/smile-panel/*.json`.
@@ -157,6 +174,19 @@ Per-emoji skin-tone choices and usage counters are kept in `~/.config/smile-pane
 ```sh
 gsettings set local.winpanel.Smile keep-open-after-insert false
 ```
+
+## Emoji font
+
+If an emoji shows as an empty box (🫆 🫪 🫩 🛘 🫍 🪾 🫜 🪊 🪉 are Unicode 16/17 and missing from older
+`fonts-noto-color-emoji` packages), point the panel at a newer or iOS-style colour emoji font:
+**Preferences → Customization → Emoji font → Choose…** and select a `NotoColorEmoji.ttf`, for example
+`system/fonts/NotoColorEmoji.ttf` from the [iOS Emoji module](https://github.com/n4bi10p/Ios-emoji).
+It applies immediately; the reset button (or `gsettings reset local.winpanel.Smile emoji-font-file`)
+goes back to the system font.
+
+The font is registered with fontconfig **inside the panel process only** (as family `Smile Emoji`), so
+nothing else on the system changes. It only affects how the panel *draws* emoji: the application you
+type into renders them with its own font.
 
 ## How it works
 
@@ -187,6 +217,7 @@ python3 tests/test_inject_targets.py   # Phase 2: Unicode injection into GTK3/4,
 tests/run_overlay_xephyr.sh [wm]  # Phase 3: overlay behaviour in Xephyr + openbox/fluxbox/icewm
 tests/run_hotkeys_xephyr.sh [wm]  # Phase 4: XGrabKey daemon
 tests/run_phase5_xephyr.sh        # Phase 5: tabs, clipboard history, skintone memory, Shift+Enter
+tests/screenshots.py              # README screenshots, see docs/SCREENSHOTS.md
 ```
 
 All of them compare `CLIPBOARD`/`PRIMARY` sentinels with `xclip -o` before and after. Results and

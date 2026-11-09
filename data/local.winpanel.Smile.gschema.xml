@@ -22,6 +22,11 @@
             <summary>Save the clipboard history on disk</summary>
             <description>Off by default. When on, the copied texts kept in the history list (never your clipboard itself) are written unencrypted to $XDG_DATA_HOME/smile-panel/clipboard_history.json, readable by your user only (0600). Password-manager entries are always skipped.</description>
         </key>
+        <key name="emoji-font-file" type="s">
+            <default>""</default>
+            <summary>Custom emoji font used to draw emoji in the panel</summary>
+            <description>Path of a colour emoji font file (for example the iOS-style NotoColorEmoji.ttf). Empty uses the system font. Only affects how the panel draws emoji.</description>
+        </key>
         <key name="key-delay-ms" type="i">
             <default>8</default>
             <summary>Delay in ms between keymap remap and key events (XTest)</summary>
